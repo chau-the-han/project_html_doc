@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product correction capture - chat flow demo</title>
+<style>
+  :root {
+    --bg: #eef1f5;
+    --phone: #ffffff;
+    --header: #1f6feb;
+    --bot: #f1f3f6;
+    --user: #1f6feb;
+    --muted: #6b7280;
+    --border: #d9dee5;
+    --accent: #16a34a;
+    --danger: #9ca3af;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", "Noto Sans JP", sans-serif;
+    background: var(--bg);
+    color: #111827;
+  }
+  header.page {
+    padding: 32px 40px 8px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  header.page h1 { margin: 0 0 6px; font-size: 24px; }
+  header.page p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 28px;
+    padding: 24px 40px 48px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .scenario h2 { font-size: 16px; margin: 0 0 4px; }
+  .scenario .desc { font-size: 13px; color: var(--muted); margin: 0 0 12px; min-height: 36px; }
+  .phone {
+    background: var(--phone);
+    border-radius: 28px;
+    border: 10px solid #1f2937;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(0,0,0,.12);
+  }
+  .phone .bar {
+    background: var(--header);
+    color: #fff;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phone .bar .dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #fff; color: var(--header);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  }
+  .chat {
+    padding: 16px 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fafbfc;
+  }
+  .msg { max-width: 86%; font-size: 14px; line-height: 1.55; }
+  .msg .bubble { padding: 10px 13px; border-radius: 16px; white-space: pre-line; word-break: break-word; }
+  .msg .en { font-size: 11.5px; color: var(--muted); margin-top: 4px; padding: 0 4px; font-style: italic; white-space: pre-line; }
+  .bot { align-self: flex-start; }
+  .bot .bubble { background: var(--bot); border-top-left-radius: 4px; }
+  .user { align-self: flex-end; text-align: right; }
+  .user .bubble { background: var(--user); color: #fff; border-top-right-radius: 4px; text-align: left; }
+  .bubble a { color: #1f6feb; text-decoration: underline; }
+  .options { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .options.row { flex-direction: row; }
+  .opt {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    text-align: left;
+    color: #1f2937;
+  }
+  .options.row .opt { flex: 1; text-align: center; }
+  .opt.picked { border-color: var(--user); background: #e8f0fe; font-weight: 600; }
+  .opt.dim { color: var(--danger); }
+  .tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 4px;
+  }
+  .tag.new { background: #fef3c7; color: #92400e; }
+  .tag.saved { background: #dcfce7; color: #166534; }
+  .tag.none { background: #f3f4f6; color: #4b5563; }
+  .diff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .diff del { color: #b91c1c; }
+  .diff ins { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .divider { text-align: center; font-size: 11px; color: var(--muted); margin: 4px 0; }
+  .worker {
+    margin-top: 14px;
+    background: #fff;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+  }
+  .worker h3 { margin: 0 0 8px; font-size: 13px; }
+  .worker table { width: 100%; border-collapse: collapse; }
+  .worker td { padding: 4px 6px; border-bottom: 1px solid #f0f2f5; vertical-align: top; }
+  .worker td:first-child { color: var(--muted); width: 38%; }
+</style>
+</head>
+<body>
+
+<header class="page">
+  <h1>User product claim: chat flow demo</h1>
+  <p>
+    The guideline search always runs with the values the user gives. After the manual links are shown,
+    if the manufacturer or model code differs from the customer's registered product, the agent asks whether to save that claim.
+    A yes answer inserts a row into a new WRT table (user claim). The registered product is never changed;
+    workers can later open the claim as reference when supporting the customer.
+    English translations are shown in grey under each message.
+  </p>
+</header>
+
+<div class="grid">
+
+  <!-- Scenario 1 -->
+  <section class="scenario">
+    <h2>1. New model code, user saves it</h2>
+    <p class="desc">The user picks a registered product but says the model code is different.</p>
+    <div class="phone">
+      <div class="bar"><span class="dot">AI</span>サポートアシスタント</div>
+      <div class="chat">
+        <div class="msg user">
+          <div class="bubble">洗濯機の取扱説明書が見たいです</div>
+          <div class="en">I'd like to see the manual for my washing machine.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble">取扱説明書を確認する製品を選んでください。
+            <div class="options">
+              <div class="opt picked">Panasonic / ドラム式洗濯機 / NA-VX900</div>
+              <div class="opt">Sharp / 冷蔵庫 / SJ-X506J</div>
+            </div>
+          </div>
+          <div class="en">Please choose the product you need instructions for.</div>
+        </div>
+        <div class="msg user">
+          <div class="bubble">あ、型番が間違ってます。正しくは NA-VX900BL です</div>
+          <div class="en">Oh, the model code is wrong. It's actually NA-VX900BL.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble">見つかったURLは以下の通りです。
+
+1. NA-VX900BL 取扱説明書
+<a href="#">https://panasonic.jp/wash/manual/NA-VX900BL.pdf</a>
+
+2. NA-VX900BL 据付説明書
+<a href="#">https://panasonic.jp/wash/manual/NA-VX900BL_setup.pdf</a></div>
+          <div class="en">Here are the URLs I found.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble"><span class="tag new">新しい製品情報</span>
+製品情報が新しく提供されたようです。
+<span class="diff">型番: <del>NA-VX900</del> → <ins>NA-VX900BL</ins></span>
+今後のサポートのためにこの情報を保存しますか？
+            <div class="options row">
+              <div class="opt picked">保存する</div>
+              <div class="opt">保存しない</div>
+            </div>
+          </div>
+          <div class="en">It looks like you've given new information about your product.
+Shall I save it so we can support you better later?</div>
+        </div>
+        <div class="msg user">
+          <div class="bubble">保存する</div>
+          <div class="en">Save</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble"><span class="tag saved">保存済み</span>
+保存しました。ほかにお手伝いできることはありますか？</div>
+          <div class="en">Saved. Is there anything else I can help with?</div>
+        </div>
+      </div>
+    </div>
+    <div class="worker">
+      <h3>Save user claim (WRT <code>t_product_claim</code>)</h3>
+      <table>
+        <tr><td>Registered product</td><td>Panasonic / ドラム式洗濯機 / NA-VX900 <em>(unchanged)</em></td></tr>
+        <tr><td>User claimed</td><td>model_code = <ins>NA-VX900BL</ins></td></tr>
+        <tr><td>Source</td><td>Chat session (guideline search)</td></tr>
+        <tr><td>Note</td><td>Reference only</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- Scenario 2 -->
+  <section class="scenario">
+    <h2>2. New manufacturer, user saves it</h2>
+    <p class="desc">The user says the registered manufacturer is wrong.</p>
+    <div class="phone">
+      <div class="bar"><span class="dot">AI</span>サポートアシスタント</div>
+      <div class="chat">
+        <div class="msg user">
+          <div class="bubble">冷蔵庫のマニュアルを探して</div>
+          <div class="en">Find the manual for my refrigerator.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble">取扱説明書を確認する製品を選んでください。
+            <div class="options">
+              <div class="opt">Panasonic / ドラム式洗濯機 / NA-VX900</div>
+              <div class="opt picked">Sharp / 冷蔵庫 / R-HXC54T</div>
+            </div>
+          </div>
+          <div class="en">Please choose the product you need instructions for.</div>
+        </div>
+        <div class="msg user">
+          <div class="bubble">メーカーはシャープじゃなくて日立です</div>
+          <div class="en">The manufacturer isn't Sharp, it's Hitachi.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble">見つかったURLは以下の通りです。
+
+1. R-HXC54T 取扱説明書
+<a href="#">https://kadenfan.hitachi.co.jp/support/manual/R-HXC54T.pdf</a></div>
+          <div class="en">Here are the URLs I found.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble"><span class="tag new">新しい製品情報</span>
+製品情報が新しく提供されたようです。
+<span class="diff">メーカー: <del>Sharp</del> → <ins>Hitachi</ins></span>
+今後のサポートのためにこの情報を保存しますか？
+            <div class="options row">
+              <div class="opt picked">保存する</div>
+              <div class="opt">保存しない</div>
+            </div>
+          </div>
+          <div class="en">It looks like you've given new information about your product.
+Shall I save it so we can support you better later?</div>
+        </div>
+        <div class="msg user">
+          <div class="bubble">保存する</div>
+          <div class="en">Save</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble"><span class="tag saved">保存済み</span>
+保存しました。ほかにお手伝いできることはありますか？</div>
+          <div class="en">Saved. Is there anything else I can help with?</div>
+        </div>
+      </div>
+    </div>
+    <div class="worker">
+      <h3>Save user claim (WRT <code>t_product_claim</code>)</h3>
+      <table>
+        <tr><td>Registered product</td><td>Sharp / 冷蔵庫 / R-HXC54T <em>(unchanged)</em></td></tr>
+        <tr><td>User claimed</td><td>manufacturer = <ins>Hitachi</ins></td></tr>
+        <tr><td>Source</td><td>Chat session (guideline search)</td></tr>
+        <tr><td>Note</td><td>Reference only</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- Scenario 3 -->
+  <section class="scenario">
+    <h2>3. User declines, it was only a test</h2>
+    <p class="desc">The user types a reply instead of pressing a button. Nothing is saved, and the agent asks for a new request.</p>
+    <div class="phone">
+      <div class="bar"><span class="dot">AI</span>サポートアシスタント</div>
+      <div class="chat">
+        <div class="msg user">
+          <div class="bubble">エアコンの説明書ください</div>
+          <div class="en">Give me the manual for my air conditioner.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble">取扱説明書を確認する製品を選んでください。
+            <div class="options">
+              <div class="opt picked">Daikin / エアコン / S40ZTAXP</div>
+              <div class="opt">Sharp / 冷蔵庫 / R-HXC54T</div>
+            </div>
+          </div>
+          <div class="en">Please choose the product you need instructions for.</div>
+        </div>
+        <div class="msg user">
+          <div class="bubble">型番を S56ZTAXP にして検索してみて</div>
+          <div class="en">Try searching with model code S56ZTAXP.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble">見つかったURLは以下の通りです。
+
+1. S56ZTAXP 取扱説明書
+<a href="#">https://www.daikin.co.jp/support/manual/S56ZTAXP.pdf</a></div>
+          <div class="en">Here are the URLs I found.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble"><span class="tag new">新しい製品情報</span>
+製品情報が新しく提供されたようです。
+<span class="diff">型番: <del>S40ZTAXP</del> → <ins>S56ZTAXP</ins></span>
+今後のサポートのためにこの情報を保存しますか？
+            <div class="options row">
+              <div class="opt dim">保存する</div>
+              <div class="opt dim">保存しない</div>
+            </div>
+          </div>
+          <div class="en">It looks like you've given new information about your product.
+Shall I save it so we can support you better later?</div>
+        </div>
+        <div class="msg user">
+          <div class="bubble">いや、保存しないで。ちょっとテストしてただけです</div>
+          <div class="en">No, don't save it. I was just testing.</div>
+        </div>
+        <div class="msg bot">
+          <div class="bubble"><span class="tag none">保存なし</span>
+承知しました。今回の情報は保存しません。
+ほかにお手伝いできることはありますか？製品の使い方やトラブル、説明書の検索など、お気軽にどうぞ。</div>
+          <div class="en">Understood. I won't save this information.
+Is there anything else I can help with? Feel free to ask about how to use a product, a problem, or finding a manual.</div>
+        </div>
+      </div>
+    </div>
+    <div class="worker">
+      <h3>Save user claim (WRT <code>t_product_claim</code>)</h3>
+      <table>
+        <tr><td>Registered product</td><td>Daikin / エアコン / S40ZTAXP <em>(unchanged)</em></td></tr>
+        <tr><td>User claim</td><td>None — user declined to save</td></tr>
+      </table>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
